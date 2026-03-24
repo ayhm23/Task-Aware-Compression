@@ -1,0 +1,77 @@
+# ─── Python ───────────────────────────────────────────────────────────────────
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+.Python
+*.egg-info/
+dist/
+build/
+*.so
+
+# ─── Virtual Environments ─────────────────────────────────────────────────────
+venv/
+.venv/
+env/
+.env
+ENV/
+
+# ─── Jupyter ──────────────────────────────────────────────────────────────────
+.ipynb_checkpoints/
+*.ipynb
+
+# ─── Embeddings Cache (large .npy files) ──────────────────────────────────────
+embeddings/cache/
+
+# ─── Raw Data ─────────────────────────────────────────────────────────────────
+data/raw/
+
+# ─── Model Checkpoints ────────────────────────────────────────────────────────
+models/checkpoints/
+*.pt
+*.pth
+*.bin
+*.safetensors
+*.ckpt
+
+# ─── Results (generated — not source) ────────────────────────────────────────
+results/plots/
+results/metrics/
+
+# ─── HuggingFace Cache ────────────────────────────────────────────────────────
+.cache/
+~/.cache/huggingface/
+# HF datasets cache written locally
+datasets_cache/
+huggingface_cache/
+
+# ─── Logs ─────────────────────────────────────────────────────────────────────
+*.log
+logs/
+wandb/
+runs/
+
+# ─── OS ───────────────────────────────────────────────────────────────────────
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# ─── IDE ──────────────────────────────────────────────────────────────────────
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# ─── OS ───────────────────────────────────────────────────────────────────────
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# ─── Logs ─────────────────────────────────────────────────────────────────────
+*.log
+logs/
+
+# ─── Wandb / MLflow (if used later) ──────────────────────────────────────────
+wandb/
+mlruns/

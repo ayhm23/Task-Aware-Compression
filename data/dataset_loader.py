@@ -57,7 +57,10 @@ def load_sts(split="train"):
     """
     Load STS-B dataset.
     Labels are float similarity scores in [0, 5], normalized to [0, 1].
+    Note: STS-B uses 'dev' instead of 'validation'.
     """
+    if split == "validation":
+        split = "dev"
     dataset = load_dataset("stsb_multi_mt", "en", split=split)
 
     sentences1 = dataset["sentence1"]
