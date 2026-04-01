@@ -97,6 +97,21 @@ class StudentCompressor(BaseCompressor):
         """
         return self.proj_to_teacher(z)
 
+    def reconstruction_loss(self, x: torch.Tensor) -> torch.Tensor:
+        """
+        Distillation-style reconstruction loss for task-agnostic training.
+        Minimises MSE between the student's projection back to teacher space
+        and the original teacher embedding x.
+
+        Args:
+            x : teacher embeddings (batch_size, input_dim=768)
+        Returns:
+            Scalar loss value
+        """
+        z    = self.forward(x)
+        proj = self.project_to_teacher_space(z)
+        return F.mse_loss(proj, x)
+
 
 class DistillationLoss(nn.Module):
     """
