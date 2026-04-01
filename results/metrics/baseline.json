@@ -1,0 +1,16 @@
+{
+  "mode": "baseline",
+  "dim": 768,
+  "sts": {
+    "spearman": 0.8275,
+    "p_value": 0.0
+  },
+  "nli": {
+    "accuracy": 0.7671,
+    "f1": 0.7678
+  },
+  "classification": {
+    "accuracy": 0.8865,
+    "f1": 0.8864
+  }
+}
