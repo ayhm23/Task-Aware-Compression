@@ -18,7 +18,6 @@ ENV/
 
 # ─── Jupyter ──────────────────────────────────────────────────────────────────
 .ipynb_checkpoints/
-*.ipynb
 
 # ─── Embeddings Cache (large .npy files) ──────────────────────────────────────
 embeddings/cache/
@@ -34,9 +33,10 @@ models/checkpoints/
 *.safetensors
 *.ckpt
 
-# ─── Results (generated — not source) ────────────────────────────────────────
-results/plots/
-results/metrics/
+# ─── Results — keep PNG figures and CSV, ignore large per-run JSON files ──────
+# Individual metric JSONs (regeneratable from checkpoints)
+results/metrics/*.json
+# Plots are part of the deliverable — do NOT ignore results/plots/*.png
 
 # ─── HuggingFace Cache ────────────────────────────────────────────────────────
 .cache/
