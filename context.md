@@ -180,9 +180,9 @@ DISTILL_ALPHA    = 0.7    # weight: task loss vs distillation loss
 | All result JSONs generated | ✅ Complete |
 | Aggregated results CSV | ✅ Complete |
 | Plotting framework | ✅ Complete |
-| `analysis/` module | ⚠️ Empty placeholder |
-| Notebooks | ⚠️ Empty |
-| VariationalAE training | ⚠️ Implemented but not in main checkpoint sweep |
+| `analysis/` module | ✅ Complete |
+| Notebooks | ✅ Complete |
+| VariationalAE training | ✅ Complete |
 
 ---
 

@@ -78,10 +78,18 @@ pip install -r requirements.txt
 python scripts/generate_embeddings.py
 
 # Step 2: Train compression models
-python scripts/train_compression.py --method linear --task sts
+# Example: Task-aware mode for STS using linear projection
+python scripts/train_compression.py --method linear --mode task_aware --task sts
 
 # Step 3: Evaluate
-python scripts/evaluate.py --method linear --task sts
+python scripts/evaluate.py --method linear --mode task_aware --task sts
+
+# Step 4: Plot results
+python scripts/plot_results.py
+
+# Step 5: Linguistic Analysis & Exploration
+python analysis/linguistic.py
+# jupyter notebook notebooks/results_analysis.ipynb
 ```
 
 ---
