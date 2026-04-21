@@ -45,6 +45,7 @@ def append_mixed(df):
 df = load_existing()
 df = append_pca(df)
 df = append_mixed(df)
+df.drop_duplicates(subset=["Method", "Dim", "Mode", "TrainTask"], keep="last", inplace=True)
 df.to_csv(os.path.join(METRICS_DIR, "full_results_table.csv"), index=False)
 print(f"Updated table: {len(df)} rows")
 print(df[df["Mode"].isin(["pca","mixed"])].to_string(index=False))

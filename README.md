@@ -81,27 +81,23 @@ python scripts/generate_embeddings.py
 # Example: Task-aware mode for STS using linear projection
 python scripts/train_compression.py --method linear --mode task_aware --task sts
 
-# Step 3: Evaluate
+# Step 3: Evaluate compression models
 python scripts/evaluate.py --method linear --mode task_aware --task sts
 
-# Step 4: Plot results
-python scripts/plot_results.py
-
-# Step 5b: PCA baseline + task selector
+# Step 4: Run PCA baselines and Task Selector
 python scripts/evaluate.py --pca
 python scripts/evaluate.py --task_selector
 
-# Step 5c: Mixed compressor (multi-task scenario)
+# Step 5: Multi-task Mixed compressor training and evaluation
 python scripts/train_compression.py --method autoencoder --mode mixed --task_a sts --task_b nli --dim 128
 python scripts/evaluate.py --method autoencoder --mode mixed --task_a sts --task_b nli --dim 128
 
-# Step 6: Generate all figures including new ones
-python scripts/plot_results.py
-python analysis/linguistic.py
-
-# Step 5: Linguistic Analysis & Exploration
+# Step 6: Linguistic Analysis & Exploration
 python analysis/linguistic.py
 # jupyter notebook notebooks/results_analysis.ipynb
+
+# Step 7: Plot all aggregated results
+python scripts/plot_results.py
 ```
 
 ---
@@ -128,7 +124,7 @@ python analysis/linguistic.py
 
 ## 💡 Key Results & Limitations
 
-- **Dataset Gap & Negative Finding (STS):** We observed that task-aware compression models never beat task-agnostic baselines for the Semantic Textual Similarity (STS) task. The best overall structure for STS was an *agnostic autoencoder* ($\rho$ = 0.8366), while the best *STS-aware* models (linear: 0.8350, autoencoder: 0.8351) produced strictly worse or identical performance compared to pre-computation. Thus, task-awareness makes zero improvement on STS, which acts as our core negative finding.
+- **Dataset Gap & Negative Finding (STS):** We observed that learned task-aware networks fail to outperform classical unsupervised methods for the Semantic Textual Similarity (STS) task. The task selector reveals that the best overall compressor for STS is **PCA at dim=256** ($\rho$ = 0.8381), which defeats both the best *agnostic autoencoder* ($\rho$ = 0.8366) and the best *STS-aware* models ($\rho$ = 0.8351). **Why?** Since STS measures semantic similarity via cosine distances, any non-linear transformations (like Autoencoders) or aggressive neural bottlenecks distort the relative distance topology of the embeddings more than a simple orthogonal PCA projection. PCA simply drops the least-varying dimensions, preserving the native hypersphere structure that the sentence-transformers rely on.
 - **Proxy Sentence Lengths:** Note that Figure 5 estimates sentence length via the $L_2$ norm of pre-computed HuggingFace embeddings offline, as a fallback heuristic to avoid silent failures while loading datasets directly. 
 
 ---
