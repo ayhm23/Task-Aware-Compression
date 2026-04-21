@@ -1,0 +1,4 @@
+Task,Best_Method,Best_Mode,Best_TrainTask,Best_Dim,Best_Score,Agnostic_Best,Metric
+sts,autoencoder,task_agnostic,agnostic,256,0.8366,0.8366,STS_spearman
+nli,autoencoder,task_aware,nli,256,0.7755,0.7553,NLI_accuracy
+classification,linear,task_agnostic,agnostic,32,0.8991,0.8991,CLS_accuracy

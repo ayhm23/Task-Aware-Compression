@@ -5,14 +5,16 @@ Unified training script for all compression methods x all tasks.
 Modes:
   task_agnostic : reconstruction loss only, balanced multi-source data
   task_aware    : compressor + task head trained jointly
+  mixed         : one compressor shared across two tasks, combined loss
 
 Usage:
   python scripts/train_compression.py --method linear --mode task_agnostic --dim 64
   python scripts/train_compression.py --method autoencoder --mode task_aware --task sts --dim 128
+  python scripts/train_compression.py --method autoencoder --mode mixed --task_a sts --task_b nli --dim 128
   python scripts/train_compression.py --all
 """
 
-import os, sys, argparse, json
+import os, sys, argparse, json, itertools
 import numpy as np
 import torch
 import torch.nn as nn
@@ -258,6 +260,166 @@ def train_task_aware(method, task, dim, epochs=NUM_EPOCHS):
     return compressor, task_head
 
 
+# ── Mixed-task training ───────────────────────────────────────────────────────
+
+def _mixed_ckpt_folder(method, task_a, task_b):
+    folder = os.path.join("models", "checkpoints", method, f"mixed_{task_a}_{task_b}")
+    os.makedirs(folder, exist_ok=True)
+    return folder
+
+
+def train_mixed(method, task_a, task_b, alpha=0.5, dim=128, epochs=NUM_EPOCHS):
+    """
+    Train one shared compressor jointly on two tasks.
+
+    Loss = alpha * loss_task_a + (1-alpha) * loss_task_b
+
+    Each task has its own head; both heads + the compressor are optimised
+    together.  When the two dataloaders have different lengths we cycle the
+    shorter one so every epoch sees all batches from the longer task.
+
+    Checkpoints:
+        models/checkpoints/{method}/mixed_{task_a}_{task_b}/dim{dim}.pt
+        models/checkpoints/{method}_head/mixed_{task_a}_{task_b}/{task_a}_dim{dim}.pt
+        models/checkpoints/{method}_head/mixed_{task_a}_{task_b}/{task_b}_dim{dim}.pt
+    """
+    print(f"\n{'='*60}")
+    print(f"  Mixed | method={method} | tasks=({task_a},{task_b}) | dim={dim} | alpha={alpha}")
+    print(f"{'='*60}")
+
+    compressor = get_compressor(method, dim).to(DEVICE)
+    head_a     = get_task_head(task_a, dim).to(DEVICE)
+    head_b     = get_task_head(task_b, dim).to(DEVICE)
+
+    params    = (list(compressor.parameters()) +
+                 list(head_a.parameters()) +
+                 list(head_b.parameters()))
+    optimizer = torch.optim.Adam(params, lr=LEARNING_RATE, weight_decay=WEIGHT_DECAY)
+    scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=epochs)
+
+    distill_loss_fn = DistillationLoss() if method == "distillation" else None
+
+    loader_a = make_dataloader(task_a, "train")
+    loader_b = make_dataloader(task_b, "train")
+
+    # Pair up batches; cycle the shorter loader
+    len_a, len_b = len(loader_a), len(loader_b)
+    history = []
+
+    for epoch in range(1, epochs + 1):
+        compressor.train()
+        head_a.train()
+        head_b.train()
+
+        total_loss_a = 0.0
+        total_loss_b = 0.0
+        n = 0
+
+        # zip the longer loader with a cycling version of the shorter
+        if len_a >= len_b:
+            paired = zip(loader_a, itertools.cycle(loader_b))
+            n_steps = len_a
+        else:
+            paired = zip(itertools.cycle(loader_a), loader_b)
+            n_steps = len_b
+
+        for batch_a, batch_b in tqdm(paired, total=n_steps,
+                                      desc=f"Epoch {epoch}/{epochs}", leave=False):
+            optimizer.zero_grad()
+
+            # ── Task A loss ──────────────────────────────────────
+            if task_a in ("sts", "nli"):
+                s1a, s2a, labs_a = (batch_a[0].to(DEVICE),
+                                    batch_a[1].to(DEVICE),
+                                    batch_a[2].to(DEVICE))
+                z1a = compressor(s1a)
+                z2a = compressor(s2a)
+                loss_a = head_a.loss(z1a, z2a, labs_a)
+                if method == "distillation":
+                    proj_a = compressor.project_to_teacher_space(z1a)
+                    loss_a, _, _ = distill_loss_fn(loss_a, proj_a, s1a)
+                else:
+                    aux_a  = compressor.reconstruction_loss(s1a)
+                    loss_a = 0.7 * loss_a + 0.3 * aux_a
+            else:  # classification
+                s1a, labs_a = batch_a[0].to(DEVICE), batch_a[1].to(DEVICE)
+                z1a    = compressor(s1a)
+                loss_a = head_a.loss(z1a, labs_a)
+                if method == "distillation":
+                    proj_a = compressor.project_to_teacher_space(z1a)
+                    loss_a, _, _ = distill_loss_fn(loss_a, proj_a, s1a)
+                else:
+                    aux_a  = compressor.reconstruction_loss(s1a)
+                    loss_a = 0.7 * loss_a + 0.3 * aux_a
+
+            # ── Task B loss ──────────────────────────────────────
+            if task_b in ("sts", "nli"):
+                s1b, s2b, labs_b = (batch_b[0].to(DEVICE),
+                                    batch_b[1].to(DEVICE),
+                                    batch_b[2].to(DEVICE))
+                z1b = compressor(s1b)
+                z2b = compressor(s2b)
+                loss_b = head_b.loss(z1b, z2b, labs_b)
+                if method == "distillation":
+                    proj_b = compressor.project_to_teacher_space(z1b)
+                    loss_b, _, _ = distill_loss_fn(loss_b, proj_b, s1b)
+                else:
+                    aux_b  = compressor.reconstruction_loss(s1b)
+                    loss_b = 0.7 * loss_b + 0.3 * aux_b
+            else:  # classification
+                s1b, labs_b = batch_b[0].to(DEVICE), batch_b[1].to(DEVICE)
+                z1b    = compressor(s1b)
+                loss_b = head_b.loss(z1b, labs_b)
+                if method == "distillation":
+                    proj_b = compressor.project_to_teacher_space(z1b)
+                    loss_b, _, _ = distill_loss_fn(loss_b, proj_b, s1b)
+                else:
+                    aux_b  = compressor.reconstruction_loss(s1b)
+                    loss_b = 0.7 * loss_b + 0.3 * aux_b
+
+            combined = alpha * loss_a + (1 - alpha) * loss_b
+            combined.backward()
+            nn.utils.clip_grad_norm_(params, 1.0)
+            optimizer.step()
+
+            total_loss_a += loss_a.item()
+            total_loss_b += loss_b.item()
+            n += 1
+
+        scheduler.step()
+        history.append({
+            "epoch":  epoch,
+            "loss_a": total_loss_a / n,
+            "loss_b": total_loss_b / n,
+        })
+        print(f"  Epoch {epoch:>2}/{epochs}  "
+              f"loss_{task_a}={total_loss_a/n:.4f}  "
+              f"loss_{task_b}={total_loss_b/n:.4f}")
+
+    # ── Save checkpoints ────────────────────────────────────────────
+    comp_folder  = _mixed_ckpt_folder(method, task_a, task_b)
+    comp_path    = os.path.join(comp_folder, f"dim{dim}.pt")
+    torch.save(compressor.state_dict(), comp_path)
+    print(f"  Compressor: {comp_path}")
+
+    head_folder = _mixed_ckpt_folder(f"{method}_head", task_a, task_b)
+    for head, tag in [(head_a, task_a), (head_b, task_b)]:
+        hp = os.path.join(head_folder, f"{tag}_dim{dim}.pt")
+        torch.save(head.state_dict(), hp)
+        print(f"  Head ({tag}): {hp}")
+
+    hist_path = os.path.join(METRICS_DIR,
+                             f"{method}_mixed_{task_a}_{task_b}_dim{dim}_train.json")
+    with open(hist_path, "w") as f:
+        json.dump({"method": method, "mode": "mixed",
+                   "task_a": task_a, "task_b": task_b,
+                   "dim": dim, "alpha": alpha,
+                   "history": history}, f, indent=2)
+    print(f"  History : {hist_path}")
+
+    return compressor, head_a, head_b
+
+
 # ── CLI ───────────────────────────────────────────────────────────────────────
 
 def main():
@@ -265,9 +427,17 @@ def main():
     parser.add_argument("--method", default="linear",
                         choices=["linear", "autoencoder", "distillation"])
     parser.add_argument("--mode",   default="task_aware",
-                        choices=["task_agnostic", "task_aware"])
+                        choices=["task_agnostic", "task_aware", "mixed"])
     parser.add_argument("--task",   default="sts",
                         choices=list(TASKS.keys()))
+    parser.add_argument("--task_a", default="sts",
+                        choices=list(TASKS.keys()),
+                        help="First task for mixed mode")
+    parser.add_argument("--task_b", default="nli",
+                        choices=list(TASKS.keys()),
+                        help="Second task for mixed mode")
+    parser.add_argument("--alpha",  type=float, default=0.5,
+                        help="Weight for task_a loss in mixed mode")
     parser.add_argument("--dim",    type=int, default=128,
                         choices=COMPRESSION_DIMS)
     parser.add_argument("--epochs", type=int, default=NUM_EPOCHS)
@@ -293,6 +463,9 @@ def main():
 
     elif args.mode == "task_agnostic":
         train_task_agnostic(args.method, args.dim, epochs=args.epochs)
+    elif args.mode == "mixed":
+        train_mixed(args.method, args.task_a, args.task_b,
+                    alpha=args.alpha, dim=args.dim, epochs=args.epochs)
     else:
         train_task_aware(args.method, args.task, args.dim, epochs=args.epochs)
 

@@ -6,21 +6,28 @@ Modes:
   baseline       : 768-dim ceiling — no compression, task head trained on raw embeddings
   task_agnostic  : compressor trained on reconstruction only (no task signal)
   task_aware     : compressor + task head trained jointly
+  pca            : sklearn PCA as a non-learned compression baseline
+  mixed          : compressor jointly trained on two tasks
 
 Usage:
   python scripts/evaluate.py --baseline
   python scripts/evaluate.py --method linear --mode task_agnostic --dim 128
   python scripts/evaluate.py --method linear --mode task_aware --train_task sts --dim 128
+  python scripts/evaluate.py --pca --pca_dim 128
+  python scripts/evaluate.py --task_selector
+  python scripts/evaluate.py --method autoencoder --mode mixed --task_a sts --task_b nli --dim 128
   python scripts/evaluate.py --all
 """
 
 import os, sys, argparse, json
 import numpy as np
 import torch
+import torch.nn as nn
 import torch.nn.functional as F
 from torch.utils.data import DataLoader, TensorDataset
 from tqdm import tqdm
 import pandas as pd
+from sklearn.decomposition import PCA
 
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
@@ -45,6 +52,11 @@ def ckpt_path(method, mode, task, dim):
     folder = os.path.join("models", "checkpoints", method, mode)
     tag = f"{task}_dim{dim}" if task else f"dim{dim}"
     return os.path.join(folder, f"{tag}.pt")
+
+
+def mixed_ckpt_path(method, task_a, task_b, dim):
+    folder = os.path.join("models", "checkpoints", method, f"mixed_{task_a}_{task_b}")
+    return os.path.join(folder, f"dim{dim}.pt")
 
 
 # ── Load cached test embeddings ───────────────────────────────────────────────
@@ -92,6 +104,36 @@ def get_compressor(method, dim):
     elif method == "distillation":
         return StudentCompressor(input_dim=EMBEDDING_DIM, output_dim=dim)
     raise ValueError(f"Unknown method: {method}")
+
+
+# ── PCA Wrapper (thin nn.Module so it plugs into existing helpers) ─────────────
+
+class PCAWrapper(nn.Module):
+    """
+    Wraps a fitted sklearn PCA model as an nn.Module so it can be used
+    as a drop-in replacement for learned compressors inside _train_eval_head
+    and run_task_eval.  No parameters are trained — it is always in eval mode.
+    """
+    def __init__(self, pca: PCA):
+        super().__init__()
+        self.pca    = pca
+        self.output_dim = pca.n_components_
+        # Store PCA arrays as buffers (non-trainable, on correct device)
+        components = torch.tensor(pca.components_, dtype=torch.float32)  # (d, 768)
+        mean       = torch.tensor(pca.mean_,       dtype=torch.float32)  # (768,)
+        self.register_buffer("components", components)
+        self.register_buffer("pca_mean",   mean)
+
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
+        """Project x (N, 768) → (N, d) using stored PCA basis."""
+        return (x - self.pca_mean) @ self.components.T
+
+    # reconstruction_loss is never called on PCAWrapper, but provide a stub
+    # so _train_eval_head doesn't crash if it's ever invoked.
+    def reconstruction_loss(self, x):
+        z   = self.forward(x)
+        rec = z @ self.components + self.pca_mean
+        return F.mse_loss(rec, x)
 
 
 # ── Baseline: train a fresh task head on raw 768-dim embeddings ───────────────
@@ -336,7 +378,7 @@ def _train_eval_head(task, compressor, dim, epochs=5):
     """
     Train a small evaluation head on compressed train embeddings.
     The compressor is frozen; only the head is trained.
-    Used for task-agnostic and cross-task evaluation.
+    Used for task-agnostic, PCA, mixed, and cross-task evaluation.
     """
     def _load(split, key):
         return torch.tensor(
@@ -383,6 +425,174 @@ def _train_eval_head(task, compressor, dim, epochs=5):
             optimizer.step()
 
     return head
+
+
+# ── PCA Baseline evaluation ───────────────────────────────────────────────────
+
+def evaluate_pca_baseline(dim):
+    """
+    Fit sklearn PCA on the pooled train embeddings from all three tasks,
+    then evaluate on all 3 eval tasks.  Saves results to pca_dim{dim}.json.
+
+    This answers the question: does a learned (neural) compressor actually
+    beat a classical unsupervised dimensionality-reduction method?
+    """
+    print(f"\n{'='*60}")
+    print(f"  PCA BASELINE | dim={dim}")
+    print(f"{'='*60}")
+
+    # Fit PCA on pooled train set (all 3 tasks) for a fair, task-agnostic view
+    print("  Fitting PCA on pooled train embeddings...")
+    all_train = []
+    for task in TASKS:
+        s1 = np.load(os.path.join(EMBEDDINGS_DIR, f"{task}_train_s1.npy"))
+        all_train.append(s1)
+        if task in ("sts", "nli"):
+            s2 = np.load(os.path.join(EMBEDDINGS_DIR, f"{task}_train_s2.npy"))
+            all_train.append(s2)
+
+    pool = np.concatenate(all_train, axis=0)
+    print(f"  PCA pool shape: {pool.shape}")
+
+    pca = PCA(n_components=dim, random_state=SEED)
+    pca.fit(pool)
+    explained = pca.explained_variance_ratio_.sum()
+    print(f"  Explained variance ({dim} PCs): {explained:.4f}")
+
+    # Wrap PCA as an nn.Module so it plugs into existing helpers
+    wrapper = PCAWrapper(pca).to(DEVICE)
+
+    results = {
+        "mode": "pca",
+        "dim":  dim,
+        "explained_variance_ratio": float(explained),
+    }
+
+    for task in TASKS:
+        print(f"  Evaluating on task={task}...")
+        head    = _train_eval_head(task, wrapper, dim)
+        metrics = run_task_eval(task, wrapper, head, dim)
+        results[task] = metrics
+        _print_task_metrics(task, metrics)
+
+    out_path = os.path.join(METRICS_DIR, f"pca_dim{dim}.json")
+    with open(out_path, "w") as f:
+        json.dump(results, f, indent=2)
+    print(f"  Saved: {out_path}")
+    return results
+
+
+# ── Task-selector table ───────────────────────────────────────────────────────
+
+def build_task_selector_table():
+    """
+    Read full_results_table.csv and find the best configuration (argmax)
+    for each downstream task column.  Produces a concise "task-selector"
+    recommendation table that directly answers the professor's question:
+    'Which compressor should I use for my task?'
+
+    Saves results/metrics/task_selector_table.csv and prints a summary.
+    """
+    csv_path = os.path.join(METRICS_DIR, "full_results_table.csv")
+    if not os.path.exists(csv_path):
+        print(f"[TaskSelector] {csv_path} not found — run --all first.")
+        return None
+
+    df = pd.read_csv(csv_path)
+
+    task_cols = {
+        "sts":            "STS_spearman",
+        "nli":            "NLI_accuracy",
+        "classification": "CLS_accuracy",
+    }
+
+    rows = []
+    print(f"\n{'='*60}")
+    print("  TASK-SELECTOR TABLE")
+    print(f"{'='*60}")
+
+    for task_name, col in task_cols.items():
+        sub = df.dropna(subset=[col])
+        best_idx = sub[col].idxmax()
+        best_row = sub.loc[best_idx]
+        score    = best_row[col]
+
+        # Also collect agnostic best and PCA best for comparison
+        agnostic_mask = sub["Mode"] == "task_agnostic"
+        agnostic_best  = sub.loc[agnostic_mask, col].max() if agnostic_mask.any() else None
+
+        entry = {
+            "Task":          task_name,
+            "Best_Method":   best_row["Method"],
+            "Best_Mode":     best_row["Mode"],
+            "Best_TrainTask": best_row["TrainTask"],
+            "Best_Dim":      int(best_row["Dim"]),
+            "Best_Score":    round(float(score), 4),
+            "Agnostic_Best": round(float(agnostic_best), 4) if agnostic_best else None,
+            "Metric":        col,
+        }
+        rows.append(entry)
+
+        print(f"\n  Task: {task_name.upper()}")
+        print(f"    Best overall : {best_row['Method']} | {best_row['Mode']} | "
+              f"train_task={best_row['TrainTask']} | dim={int(best_row['Dim'])} "
+              f"→ {col}={score:.4f}")
+        if agnostic_best:
+            delta = score - agnostic_best
+            print(f"    Agnostic best: {agnostic_best:.4f}  (aware gain: {delta:+.4f})")
+
+    selector_df = pd.DataFrame(rows)
+    out_path = os.path.join(METRICS_DIR, "task_selector_table.csv")
+    selector_df.to_csv(out_path, index=False)
+    print(f"\n  Saved task-selector: {out_path}")
+    print(selector_df.to_string(index=False))
+    return selector_df
+
+
+# ── Mixed-compressor evaluation ───────────────────────────────────────────────
+
+def evaluate_mixed(method, task_a, task_b, dim):
+    """
+    Load a mixed compressor (jointly trained on task_a + task_b) and evaluate
+    on ALL three tasks.  Each eval task gets a fresh probe head trained on the
+    compressed embeddings.
+
+    Checkpoint convention (must match train_compression.py):
+        models/checkpoints/{method}/mixed_{task_a}_{task_b}/dim{dim}.pt
+    """
+    print(f"\n{'='*60}")
+    print(f"  MIXED | method={method} | tasks=({task_a},{task_b}) | dim={dim}")
+    print(f"{'='*60}")
+
+    comp_path = mixed_ckpt_path(method, task_a, task_b, dim)
+    if not os.path.exists(comp_path):
+        print(f"  [SKIP] mixed compressor checkpoint not found: {comp_path}")
+        return None
+
+    compressor = get_compressor(method, dim)
+    compressor.load_state_dict(torch.load(comp_path, map_location=DEVICE))
+    compressor.to(DEVICE).eval()
+
+    results = {
+        "mode":   "mixed",
+        "method": method,
+        "task_a": task_a,
+        "task_b": task_b,
+        "dim":    dim,
+    }
+
+    for eval_task in TASKS:
+        head    = _train_eval_head(eval_task, compressor, dim)
+        metrics = run_task_eval(eval_task, compressor, head, dim)
+        results[eval_task] = metrics
+        _print_task_metrics(eval_task, metrics)
+
+    tag  = f"{method}_mixed_{task_a}_{task_b}_dim{dim}"
+    path = os.path.join(METRICS_DIR, f"{tag}.json")
+    with open(path, "w") as f:
+        json.dump(results, f, indent=2)
+    print(f"  Saved: {path}")
+    return results
 
 
 # ── Full sweep + CSV table ────────────────────────────────────────────────────
@@ -456,20 +666,41 @@ def main():
     parser.add_argument("--method",     default="linear",
                         choices=["linear", "autoencoder", "distillation"])
     parser.add_argument("--mode",       default="task_agnostic",
-                        choices=["task_agnostic", "task_aware"])
+                        choices=["task_agnostic", "task_aware", "mixed"])
     parser.add_argument("--train_task", default="sts",
                         choices=list(TASKS.keys()),
                         help="Which task the compressor was trained on (task_aware only)")
     parser.add_argument("--dim",        type=int, default=128,
                         choices=COMPRESSION_DIMS)
+    # PCA baseline args
+    parser.add_argument("--pca",        action="store_true",
+                        help="Run PCA baseline across all COMPRESSION_DIMS")
+    parser.add_argument("--pca_dim",    type=int, default=None,
+                        choices=COMPRESSION_DIMS,
+                        help="Run PCA baseline for a single dim")
+    parser.add_argument("--task_selector", action="store_true",
+                        help="Build task-selector table from full_results_table.csv")
+    # Mixed compressor args
+    parser.add_argument("--task_a",     default="sts",  choices=list(TASKS.keys()))
+    parser.add_argument("--task_b",     default="nli",  choices=list(TASKS.keys()))
+
     args = parser.parse_args()
 
     if args.all:
         evaluate_all()
     elif args.baseline:
         evaluate_baseline()
+    elif args.pca:
+        dims = [args.pca_dim] if args.pca_dim else COMPRESSION_DIMS
+        for d in dims:
+            evaluate_pca_baseline(d)
+        build_task_selector_table()
+    elif args.task_selector:
+        build_task_selector_table()
     elif args.mode == "task_agnostic":
         evaluate_task_agnostic(args.method, args.dim)
+    elif args.mode == "mixed":
+        evaluate_mixed(args.method, args.task_a, args.task_b, args.dim)
     else:
         evaluate_task_aware(args.method, args.train_task, args.dim)
 
