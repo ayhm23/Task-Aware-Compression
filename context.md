@@ -25,7 +25,7 @@ Task-Aware-Compression/
 ├── compression/               # Core compression methods
 │   ├── base.py                # Abstract BaseCompressor class
 │   ├── linear.py              # Linear projection (768→d), optional BatchNorm
-│   ├── autoencoder.py         # AE (768→512→d→512→768), VariationalAE variant
+│   ├── autoencoder.py         # AE (768→512→d→512→768)
 │   └── distillation.py        # StudentCompressor MLP (768→512→256→d)
 │
 ├── embeddings/
@@ -52,7 +52,7 @@ Task-Aware-Compression/
 │   └── plot_results.py        # Step 4: generate 4 publication-quality figures
 │
 ├── analysis/                  # Placeholder — empty, intended for linguistic analysis
-├── notebooks/                 # Empty
+├── notebooks/                 # Jupyter notebooks for exploration and analysis
 └── results/
     ├── metrics/               # 48 JSON files + full_results_table.csv
     └── plots/                 # Generated figures
@@ -68,7 +68,7 @@ Task-Aware-Compression/
 |--------|-------------|------------|
 | **Linear** | 768 → d (single layer, optional BN) | Simplest; decoder for reconstruction loss |
 | **Autoencoder** | 768 → 512 → d → 512 → 768 | Bottleneck = compressed rep; reconstruction + optional task loss |
-| **Distillation** | 768 → 512 → 256 → d (MLP student) | Projection head maps back to teacher space for distillation loss |
+| **Representation Matching Distillation** | 768 → 512 → 256 → d (MLP student) | Projection head maps back to teacher space for distillation loss |
 
 ### 2. Two Training Modes
 
@@ -176,7 +176,7 @@ DISTILL_ALPHA    = 0.7    # weight: task loss vs distillation loss
 
 | Component | Status |
 |-----------|--------|
-| Compression methods (linear, AE, distillation) | ✅ Complete |
+| Compression methods (linear, AE, representation matching distillation) | ✅ Complete |
 | Dual training modes (agnostic / aware) | ✅ Complete |
 | Dataset loading & embedding caching | ✅ Complete |
 | Task heads (STS, NLI, classification) | ✅ Complete |
@@ -187,8 +187,7 @@ DISTILL_ALPHA    = 0.7    # weight: task loss vs distillation loss
 | Aggregated results CSV & Task Selector | ✅ Complete |
 | Plotting framework | ✅ Complete (9 Figures) |
 | `analysis/` module | ✅ Complete |
-| Notebooks | ❌ Not implemented |
-| VariationalAE training | ❌ Not implemented |
+| Notebooks | ✅ Complete |
 
 ---
 
@@ -196,6 +195,4 @@ DISTILL_ALPHA    = 0.7    # weight: task loss vs distillation loss
 
 - **Cross-task generalization deep dive:** Qualitative analysis of which tasks share compressible structure
 - **Ablation studies:** Dropout, batch norm, activation function, hidden dim choices
-- **VariationalAE full sweep:** Same checkpoint/eval pipeline as the standard AE
 - **Inference benchmarking:** Latency and memory footprint comparison
-- **Exploration notebooks:** Interactive analysis in `notebooks/`

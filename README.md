@@ -118,7 +118,7 @@ python scripts/plot_results.py
 |--------|------|
 | Linear Projection | Task-agnostic / Task-aware |
 | Autoencoder | Task-agnostic / Task-aware |
-| Knowledge Distillation | Task-aware |
+| Representation Matching Distillation | Task-aware |
 
 ---
 
