@@ -107,7 +107,7 @@ python scripts/plot_results.py
 | Task | Dataset | Metric |
 |------|---------|--------|
 | Semantic Textual Similarity | STS-B | Spearman ρ |
-| Natural Language Inference | SNLI / MultiNLI | Accuracy |
+| Natural Language Inference | SNLI | Accuracy |
 | Text Classification | SST-2 | Accuracy |
 
 ---
