@@ -461,6 +461,12 @@ def main():
                 for dim in dims:
                     train_task_aware(method, task, dim, epochs=args.epochs)
 
+        print("\n[Train All] Mixed runs...")
+        for method in ["autoencoder"]:      # extend to linear if time permits
+            for pair in [("sts","nli"), ("nli","classification")]:
+                for dim in [128, 256]:
+                    train_mixed(method, pair[0], pair[1], dim=dim, epochs=args.epochs)
+
     elif args.mode == "task_agnostic":
         train_task_agnostic(args.method, args.dim, epochs=args.epochs)
     elif args.mode == "mixed":

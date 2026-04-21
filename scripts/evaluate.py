@@ -536,7 +536,7 @@ def build_task_selector_table():
         print(f"\n  Task: {task_name.upper()}")
         print(f"    Best overall : {best_row['Method']} | {best_row['Mode']} | "
               f"train_task={best_row['TrainTask']} | dim={int(best_row['Dim'])} "
-              f"→ {col}={score:.4f}")
+              f"-> {col}={score:.4f}")
         if agnostic_best:
             delta = score - agnostic_best
             print(f"    Agnostic best: {agnostic_best:.4f}  (aware gain: {delta:+.4f})")
@@ -624,7 +624,7 @@ def build_results_table(all_results):
     df = pd.DataFrame(rows)
     csv_path = os.path.join(METRICS_DIR, "full_results_table.csv")
     df.to_csv(csv_path, index=False)
-    print(f"\n[Results] Saved full table → {csv_path}")
+    print(f"\n[Results] Saved full table -> {csv_path}")
     print(df.to_string(index=False))
     return df
 
@@ -651,6 +651,15 @@ def evaluate_all():
         for train_task in TASKS:
             for dim in COMPRESSION_DIMS:
                 all_results.append(evaluate_task_aware(method, train_task, dim))
+
+    # PCA baselines
+    for dim in COMPRESSION_DIMS:
+        all_results.append(evaluate_pca_baseline(dim))
+
+    # Mixed compressors
+    for pair in [("sts","nli"), ("nli","classification")]:
+        for dim in [128, 256]:
+            all_results.append(evaluate_mixed("autoencoder", pair[0], pair[1], dim))
 
     build_results_table(all_results)
 

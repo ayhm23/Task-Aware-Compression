@@ -216,8 +216,11 @@ def plot_sentence_length_analysis():
     x         = np.arange(len(bucket_names))
     bar_width  = 0.25
     fig, ax   = plt.subplots(figsize=(9, 5))
-    fig.suptitle("STS Performance by Sentence Length (dim=128, Task-Agnostic)",
-                 fontsize=12, fontweight="bold")
+    fig.suptitle(
+        "STS Performance by Sentence Length (dim=128, Task-Agnostic)\n"
+        "Note: length estimated via embedding L2 norm (actual word counts unavailable offline)",
+        fontsize=11, fontweight="bold"
+    )
 
     for i, method in enumerate(METHODS):
         offset = (i - 1) * bar_width
@@ -323,61 +326,48 @@ def plot_tsne_comparison():
 # ─── Fig 7: Compression Error Analysis ────────────────────────────────────────
 
 def plot_compression_error():
-    """
-    For each method at each dim, compute mean cosine similarity between
-    original 768-dim embedding and compressed→zero-padded-to-768 embedding
-    on STS test s1 embeddings.
-    """
-    print("[Fig 7] Compression error analysis...")
-
-    s1_emb = _load_npy("sts_test_s1")    # (N, 768)
-    n      = len(s1_emb)
+    print("[Fig 7] Compression error analysis (reconstruction MSE)...")
+    s1_emb = _load_npy("sts_test_s1")
 
     results = {m: [] for m in METHODS}
 
     for method in METHODS:
         for dim in DIMS:
-            model      = _load_compressor(method, "task_agnostic", None, dim)
-            compressed = _compress_batch(model, s1_emb)      # (N, dim)
+            model = _load_compressor(method, "task_agnostic", None, dim)
+            t = torch.tensor(s1_emb, dtype=torch.float32)
 
-            # Zero-pad compressed to 768 for cosine similarity comparison
-            padded = np.zeros((n, EMBEDDING_DIM), dtype=np.float32)
-            padded[:, :dim] = compressed
+            with torch.no_grad():
+                z = model(t)                       # compress
+                if hasattr(model, "reconstruct"):
+                    x_hat = model.reconstruct(z)   # AE / Linear decoder
+                elif hasattr(model, "project_to_teacher_space"):
+                    x_hat = model.project_to_teacher_space(z)  # distillation
+                else:
+                    x_hat = t  # fallback
 
-            # Cosine similarity between original and padded
-            orig_norm   = s1_emb / (np.linalg.norm(s1_emb, axis=1, keepdims=True) + 1e-9)
-            padded_norm = padded  / (np.linalg.norm(padded, axis=1, keepdims=True) + 1e-9)
-            cosine_sims = (orig_norm * padded_norm).sum(axis=1)   # (N,)
+                mse = float(((t - x_hat) ** 2).mean())
+            results[method].append(mse)
 
-            results[method].append(float(cosine_sims.mean()))
-
-    # ── Plot ──────────────────────────────────────────────────────
     fig, ax = plt.subplots(figsize=(8, 5))
-    fig.suptitle("Compression Fidelity: Mean Cosine Similarity (Original vs Reconstructed)\n"
-                 "Task-Agnostic Compressors, STS Test Set",
-                 fontsize=12, fontweight="bold")
-
+    fig.suptitle(
+        "Reconstruction MSE: Original vs Decoded  (Task-Agnostic, STS Test Set)",
+        fontsize=12, fontweight="bold"
+    )
     markers = {"linear": "o", "autoencoder": "s", "distillation": "^"}
-
     for method in METHODS:
         ax.plot(DIMS, results[method],
-                color=METHOD_COLOR[method],
-                marker=markers[method],
-                linewidth=2, markersize=8,
-                label=METHOD_LABEL[method])
+                color=METHOD_COLOR[method], marker=markers[method],
+                linewidth=2, markersize=8, label=METHOD_LABEL[method])
         for dim, val in zip(DIMS, results[method]):
-            ax.annotate(f"{val:.3f}", (dim, val),
+            ax.annotate(f"{val:.4f}", (dim, val),
                         textcoords="offset points", xytext=(0, 8),
-                        ha="center", fontsize=8,
-                        color=METHOD_COLOR[method])
+                        ha="center", fontsize=8, color=METHOD_COLOR[method])
 
     ax.set_xlabel("Compressed Dimension")
-    ax.set_ylabel("Mean Cosine Similarity")
+    ax.set_ylabel("Mean Squared Error (lower = better)")
     ax.set_xticks(DIMS)
     ax.set_xticklabels([f"{d}\n({768//d}× ratio)" for d in DIMS])
-    ax.set_ylim(0.0, 1.05)
-    ax.legend(loc="lower right", framealpha=0.85)
-
+    ax.legend(loc="upper right", framealpha=0.85)
     fig.tight_layout()
     _save(fig, "fig7_compression_error.png")
 

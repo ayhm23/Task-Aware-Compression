@@ -108,7 +108,8 @@ All four steps have been run. Results and checkpoints are fully populated.
 checkpoints/
 ├── autoencoder/
 │   ├── task_agnostic/     dim32.pt, dim64.pt, dim128.pt, dim256.pt
-│   └── task_aware/        {sts,nli,classification}_dim{32,64,128,256}.pt
+│   ├── task_aware/        {sts,nli,classification}_dim{32,64,128,256}.pt
+│   └── mixed_*/           (sts_nli, nli_classification) dim128.pt, dim256.pt
 ├── autoencoder_head/      task heads for aware models (same structure)
 ├── distillation/          (same structure)
 ├── distillation_head/
@@ -127,6 +128,8 @@ checkpoints/
 **Naming convention:**  
 - Agnostic: `{method}_agnostic_dim{d}.json`  
 - Aware: `{method}_aware_{task}_dim{d}.json`  
+- Mixed: `{method}_mixed_{task_a}_{task_b}_dim{d}.json`
+- PCA Baseline: `pca_dim{d}.json`
 - Baseline: `baseline.json` (full 768-dim ceiling)
 
 **Matrix covered:**
@@ -136,11 +139,13 @@ checkpoints/
 | linear_agnostic | ✅ | ✅ | ✅ | ✅ |
 | autoencoder_agnostic | ✅ | ✅ | ✅ | ✅ |
 | distillation_agnostic | ✅ | ✅ | ✅ | ✅ |
+| pca | ✅ | ✅ | ✅ | ✅ |
+| autoencoder_mixed | ❌ | ❌ | ✅×2 | ✅×2 |
 | *_aware_sts | ✅×3 | ✅×3 | ✅×3 | ✅×3 |
 | *_aware_nli | ✅×3 | ✅×3 | ✅×3 | ✅×3 |
 | *_aware_classification | ✅×3 | ✅×3 | ✅×3 | ✅×3 |
 
-**Total:** 48 JSON files + `full_results_table.csv` (aggregated)
+**Total:** 56 JSON files + `full_results_table.csv` + `task_selector_table.csv`
 
 **Metrics tracked:**
 - STS: Spearman ρ, p-value
@@ -176,19 +181,19 @@ DISTILL_ALPHA    = 0.7    # weight: task loss vs distillation loss
 | Dataset loading & embedding caching | ✅ Complete |
 | Task heads (STS, NLI, classification) | ✅ Complete |
 | Evaluation metrics & cross-task testing | ✅ Complete |
+| PCA baselines & Mixed Joint Learning | ✅ Complete |
 | All checkpoints saved | ✅ Complete |
 | All result JSONs generated | ✅ Complete |
-| Aggregated results CSV | ✅ Complete |
-| Plotting framework | ✅ Complete |
+| Aggregated results CSV & Task Selector | ✅ Complete |
+| Plotting framework | ✅ Complete (9 Figures) |
 | `analysis/` module | ✅ Complete |
-| Notebooks | ✅ Complete (1_exploration.ipynb) |
-| VariationalAE training | ❌ Deferred to Future Work |
+| Notebooks | ❌ Not implemented |
+| VariationalAE training | ❌ Not implemented |
 
 ---
 
 ## What Could Still Be Done
 
-- **Linguistic analysis** (fill `analysis/`): t-SNE/UMAP visualizations of compressed embeddings, error case studies, attention probing
 - **Cross-task generalization deep dive:** Qualitative analysis of which tasks share compressible structure
 - **Ablation studies:** Dropout, batch norm, activation function, hidden dim choices
 - **VariationalAE full sweep:** Same checkpoint/eval pipeline as the standard AE

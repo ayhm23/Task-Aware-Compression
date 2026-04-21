@@ -301,6 +301,93 @@ def plot_aware_vs_agnostic_delta(df, show=False):
 
 # ─── Helpers ──────────────────────────────────────────────────────────────────
 
+def plot_pca_comparison(df, show=False):
+    """Fig 8: PCA vs learned compressors — shows where learning beats classical."""
+    base = baseline_scores(df)
+    fig, axes = plt.subplots(1, 3, figsize=(14, 4.5))
+    fig.suptitle("PCA vs Learned Compressors (Task-Agnostic)\n"
+                 "Shows where neural compression outperforms classical PCA",
+                 fontsize=12, fontweight="bold")
+
+    pca_color = "#9C27B0"
+    for ax, task in zip(axes, TASKS):
+        metric = TASK_METRIC[task]
+        ax.axhline(base[task], color="black", linestyle="--", linewidth=1.3,
+                   label="Baseline (768-d)", alpha=0.7)
+
+        # PCA line
+        pca_rows = df[df["Mode"] == "pca"].sort_values("Dim")
+        if len(pca_rows):
+            ax.plot(pca_rows["Dim"], pca_rows[metric], color=pca_color,
+                    marker="D", linewidth=2, markersize=7, linestyle="--", label="PCA")
+
+        for method in METHODS:
+            sub = df[(df["Mode"] == "task_agnostic") &
+                     (df["Method"] == method)].sort_values("Dim")
+            ax.plot(sub["Dim"], sub[metric],
+                    color=METHOD_COLOR[method], marker=METHOD_MARKER[method],
+                    linewidth=2, markersize=7, label=METHOD_LABEL[method])
+
+        ax.set_title(TASK_LABEL[task])
+        ax.set_xlabel("Compressed Dimension")
+        ax.set_ylabel("Score")
+        ax.set_xticks(DIMS)
+        if task == "sts":
+            ax.legend(fontsize=8.5, loc="lower right")
+
+    fig.tight_layout()
+    _save(fig, "fig8_pca_vs_learned.png", show)
+
+
+def plot_mixed_interpolation(df, show=False):
+    """Fig 9: Mixed compressor sits between single-task compressors."""
+    base = baseline_scores(df)
+    pairs = [("sts", "nli"), ("nli", "classification")]
+    fig, axes = plt.subplots(1, 2, figsize=(12, 5))
+    fig.suptitle("Mixed Compressor Interpolation (autoencoder, dim=128 & 256)\n"
+                 "Mixed score should lie between the two single-task compressors",
+                 fontsize=12, fontweight="bold")
+
+    colors = {"single_a": "#2196F3", "mixed": "#FF9800", "single_b": "#4CAF50"}
+
+    for ax, (ta, tb) in zip(axes, pairs):
+        metric_a = TASK_METRIC[ta]
+        metric_b = TASK_METRIC[tb]
+        dims_available = []
+        scores_a, scores_b, scores_mix = [], [], []
+
+        for dim in [128, 256]:
+            single_a = df[(df["Method"] == "autoencoder") & (df["Mode"] == "task_aware") &
+                          (df["TrainTask"] == ta) & (df["Dim"] == dim)]
+            single_b = df[(df["Method"] == "autoencoder") & (df["Mode"] == "task_aware") &
+                          (df["TrainTask"] == tb) & (df["Dim"] == dim)]
+            mixed_r  = df[(df["Method"] == "autoencoder") & (df["Mode"] == "mixed") &
+                          (df["TrainTask"] == f"{ta}+{tb}") & (df["Dim"] == dim)]
+            if len(single_a) and len(single_b) and len(mixed_r):
+                dims_available.append(dim)
+                # Use average of the two task metrics to show interpolation
+                scores_a.append((single_a[metric_a].values[0] + single_a[metric_b].values[0]) / 2)
+                scores_b.append((single_b[metric_a].values[0] + single_b[metric_b].values[0]) / 2)
+                scores_mix.append((mixed_r[metric_a].values[0] + mixed_r[metric_b].values[0]) / 2)
+
+        if dims_available:
+            ax.plot(dims_available, scores_a, color=colors["single_a"],
+                    marker="o", linewidth=2, markersize=8, label=f"Task-aware ({ta.upper()} only)")
+            ax.plot(dims_available, scores_mix, color=colors["mixed"],
+                    marker="s", linewidth=2, markersize=8, linestyle="--", label="Mixed (α=0.5)")
+            ax.plot(dims_available, scores_b, color=colors["single_b"],
+                    marker="^", linewidth=2, markersize=8, label=f"Task-aware ({tb.upper()} only)")
+
+        ax.set_title(f"Tasks: {ta.upper()} + {tb.upper()}")
+        ax.set_xlabel("Compressed Dimension")
+        ax.set_ylabel("Avg score across both tasks")
+        ax.set_xticks([128, 256])
+        ax.legend(fontsize=9)
+
+    fig.tight_layout()
+    _save(fig, "fig9_mixed_interpolation.png", show)
+
+
 def _save(fig, filename, show):
     path = os.path.join(PLOTS_DIR, filename)
     fig.savefig(path, bbox_inches="tight")
@@ -338,6 +425,12 @@ def main():
 
     print("[Fig 4] Task-Aware vs Task-Agnostic Delta...")
     plot_aware_vs_agnostic_delta(df, args.show)
+
+    print("[Fig 8] PCA vs Learned Compressors...")
+    plot_pca_comparison(df, args.show)
+
+    print("[Fig 9] Mixed Compressor Interpolation...")
+    plot_mixed_interpolation(df, args.show)
 
     print(f"\n[Done] All figures saved to: {PLOTS_DIR}")
 
