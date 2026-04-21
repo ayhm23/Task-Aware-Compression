@@ -181,8 +181,8 @@ DISTILL_ALPHA    = 0.7    # weight: task loss vs distillation loss
 | Aggregated results CSV | ✅ Complete |
 | Plotting framework | ✅ Complete |
 | `analysis/` module | ✅ Complete |
-| Notebooks | ✅ Complete |
-| VariationalAE training | ✅ Complete |
+| Notebooks | ✅ Complete (1_exploration.ipynb) |
+| VariationalAE training | ❌ Deferred to Future Work |
 
 ---
 
