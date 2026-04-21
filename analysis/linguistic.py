@@ -174,9 +174,9 @@ def plot_sentence_length_analysis():
         "long":   np.where(word_counts > 15)[0],
     }
     bucket_names = ["short", "medium", "long"]
-    bucket_labels = [f"Short\n(≤ 8 words)\nn={len(buckets['short'])}",
-                     f"Medium\n(9-15 words)\nn={len(buckets['medium'])}",
-                     f"Long\n(≥ 16 words)\nn={len(buckets['long'])}"]
+    bucket_labels = [f"Low Norm\n(Bottom 33%)\nn={len(buckets['short'])}",
+                     f"Medium Norm\n(Middle 33%)\nn={len(buckets['medium'])}",
+                     f"High Norm\n(Top 33%)\nn={len(buckets['long'])}"]
 
     dim = 128
     results = {m: [] for m in METHODS}
@@ -217,8 +217,8 @@ def plot_sentence_length_analysis():
     bar_width  = 0.25
     fig, ax   = plt.subplots(figsize=(9, 5))
     fig.suptitle(
-        "STS Performance by Sentence Length (dim=128, Task-Agnostic)\n"
-        "Note: length estimated via embedding L2 norm (actual word counts unavailable offline)",
+        "STS Performance by Embedding L2 Norm (dim=128, Task-Agnostic)\n"
+        "Note: L2 Norm is used as a rough offline proxy for sentence complexity/length.",
         fontsize=11, fontweight="bold"
     )
 
@@ -237,7 +237,7 @@ def plot_sentence_length_analysis():
     ax.set_xticks(x)
     ax.set_xticklabels(bucket_labels, fontsize=10)
     ax.set_ylabel("Spearman ρ")
-    ax.set_xlabel("Sentence Length Bucket")
+    ax.set_xlabel("Embedding L2 Norm Bucket")
     ax.legend(loc="lower right", framealpha=0.85)
 
     all_vals = [v for m in METHODS for v in results[m] if not np.isnan(v)]
