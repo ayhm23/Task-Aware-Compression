@@ -52,7 +52,11 @@ pca,32,pca,agnostic,0.7873,0.7011,0.8888
 pca,64,pca,agnostic,0.8256,0.739,0.8899
 pca,128,pca,agnostic,0.8335,0.7567,0.8888
 pca,256,pca,agnostic,0.8381,0.7658,0.8853
+autoencoder,32,mixed,sts+nli,0.761,0.7422,0.7993
+autoencoder,64,mixed,sts+nli,0.7896,0.7534,0.8555
 autoencoder,128,mixed,sts+nli,0.7998,0.7643,0.8601
 autoencoder,256,mixed,sts+nli,0.8085,0.7537,0.8693
+autoencoder,32,mixed,nli+classification,0.7388,0.7395,0.8888
+autoencoder,64,mixed,nli+classification,0.8017,0.7552,0.8876
 autoencoder,128,mixed,nli+classification,0.8124,0.7625,0.8911
 autoencoder,256,mixed,nli+classification,0.8219,0.7572,0.8853

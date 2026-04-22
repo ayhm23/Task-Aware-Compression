@@ -25,7 +25,7 @@ def append_pca(df):
 def append_mixed(df):
     rows = []
     for pair in [("sts", "nli"), ("nli", "classification")]:
-        for dim in [128, 256]:
+        for dim in [32, 64, 128, 256]:
             ta, tb = pair
             path = os.path.join(METRICS_DIR, f"autoencoder_mixed_{ta}_{tb}_dim{dim}.json")
             if not os.path.exists(path):
