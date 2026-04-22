@@ -252,9 +252,10 @@ def plot_sentence_length_analysis():
 
 def plot_tsne_comparison():
     """
-    Side-by-side t-SNE of NLI test embeddings:
-      Left  — raw 768-dim
-      Right — autoencoder agnostic, compressed to 128-dim
+    3-panel t-SNE of NLI test embeddings:
+      Left   — raw 768-dim
+      Centre — autoencoder agnostic, compressed to 128-dim
+      Right  — NLI-aware autoencoder, compressed to 128-dim
     2 000 stratified samples, coloured by NLI label.
     """
     print("[Fig 6] t-SNE comparison...")
@@ -284,27 +285,36 @@ def plot_tsne_comparison():
     labels_sample = labels[idx]          # (2000,)
 
     # ── Compress with autoencoder agnostic dim=128 ─────────────────
-    model      = _load_compressor("autoencoder", "task_agnostic", None, 128)
-    comp_sample = _compress_batch(model, raw_sample)   # (2000, 128)
+    model_agnostic = _load_compressor("autoencoder", "task_agnostic", None, 128)
+    comp_agnostic  = _compress_batch(model_agnostic, raw_sample)   # (2000, 128)
+
+    # ── Compress with NLI-aware autoencoder dim=128 ────────────────
+    model_aware = _load_compressor("autoencoder", "task_aware", "nli", 128)
+    comp_aware  = _compress_batch(model_aware, raw_sample)   # (2000, 128)
 
     # ── t-SNE ─────────────────────────────────────────────────────
     print("  Running t-SNE on raw embeddings...")
     tsne_raw  = TSNE(n_components=2, perplexity=30, random_state=42, max_iter=1000)
     xy_raw    = tsne_raw.fit_transform(raw_sample.astype(np.float32))
 
-    print("  Running t-SNE on compressed embeddings...")
-    tsne_comp = TSNE(n_components=2, perplexity=30, random_state=42, max_iter=1000)
-    xy_comp   = tsne_comp.fit_transform(comp_sample.astype(np.float32))
+    print("  Running t-SNE on agnostic compressed embeddings...")
+    tsne_agn  = TSNE(n_components=2, perplexity=30, random_state=42, max_iter=1000)
+    xy_agn    = tsne_agn.fit_transform(comp_agnostic.astype(np.float32))
+
+    print("  Running t-SNE on NLI-aware compressed embeddings...")
+    tsne_aw   = TSNE(n_components=2, perplexity=30, random_state=42, max_iter=1000)
+    xy_aw     = tsne_aw.fit_transform(comp_aware.astype(np.float32))
 
     # ── Plot ──────────────────────────────────────────────────────
-    fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(13, 5.5))
+    fig, (ax1, ax2, ax3) = plt.subplots(1, 3, figsize=(19, 5.5))
     fig.suptitle("t-SNE of NLI Test Embeddings (2 000 stratified samples)",
                  fontsize=13, fontweight="bold")
 
     scatter_kw = dict(s=8, alpha=0.65, linewidths=0)
 
-    for ax, xy, title in [(ax1, xy_raw, "Raw Embeddings (768-dim)"),
-                           (ax2, xy_comp, "Autoencoder Agnostic (128-dim)")]:
+    for ax, xy, title in [(ax1, xy_raw,  "Raw Embeddings (768-dim)"),
+                           (ax2, xy_agn,  "Autoencoder Agnostic (128-dim)"),
+                           (ax3, xy_aw,   "NLI-Aware Autoencoder (128-dim)")]:
         for label_id in [0, 1, 2]:
             mask = labels_sample == label_id
             ax.scatter(xy[mask, 0], xy[mask, 1],
