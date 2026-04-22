@@ -344,7 +344,7 @@ def plot_mixed_interpolation(df, show=False):
     base = baseline_scores(df)
     pairs = [("sts", "nli"), ("nli", "classification")]
     fig, axes = plt.subplots(1, 2, figsize=(12, 5))
-    fig.suptitle("Mixed Compressor Interpolation (autoencoder, dim=128 & 256)\n"
+    fig.suptitle("Mixed Compressor Interpolation (autoencoder, all dims)\n"
                  "Mixed score should lie between the two single-task compressors",
                  fontsize=12, fontweight="bold")
 
@@ -356,7 +356,7 @@ def plot_mixed_interpolation(df, show=False):
         dims_available = []
         scores_a, scores_b, scores_mix = [], [], []
 
-        for dim in [128, 256]:
+        for dim in DIMS:
             single_a = df[(df["Method"] == "autoencoder") & (df["Mode"] == "task_aware") &
                           (df["TrainTask"] == ta) & (df["Dim"] == dim)]
             single_b = df[(df["Method"] == "autoencoder") & (df["Mode"] == "task_aware") &
@@ -381,7 +381,7 @@ def plot_mixed_interpolation(df, show=False):
         ax.set_title(f"Tasks: {ta.upper()} + {tb.upper()}")
         ax.set_xlabel("Compressed Dimension")
         ax.set_ylabel("Avg score across both tasks")
-        ax.set_xticks([128, 256])
+        ax.set_xticks(dims_available if dims_available else DIMS)
         ax.legend(fontsize=9)
 
     fig.tight_layout()
