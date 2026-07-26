@@ -1,0 +1,17 @@
+{
+  "mode": "pca",
+  "dim": 128,
+  "explained_variance_ratio": 0.750454306602478,
+  "sts": {
+    "spearman": 0.8335,
+    "p_value": 0.0
+  },
+  "nli": {
+    "accuracy": 0.7567,
+    "f1": 0.7553
+  },
+  "classification": {
+    "accuracy": 0.8888,
+    "f1": 0.8886
+  }
+}

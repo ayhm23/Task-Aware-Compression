@@ -1,0 +1,18 @@
+{
+  "mode": "task_aware",
+  "method": "linear",
+  "train_task": "classification",
+  "dim": 128,
+  "sts": {
+    "spearman": 0.8305,
+    "p_value": 0.0
+  },
+  "nli": {
+    "accuracy": 0.7262,
+    "f1": 0.7239
+  },
+  "classification": {
+    "accuracy": 0.8876,
+    "f1": 0.8875
+  }
+}

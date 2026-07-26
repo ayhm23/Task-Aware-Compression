@@ -1,0 +1,19 @@
+{
+  "mode": "mixed",
+  "method": "autoencoder",
+  "task_a": "sts",
+  "task_b": "nli",
+  "dim": 64,
+  "sts": {
+    "spearman": 0.7896,
+    "p_value": 0.0
+  },
+  "nli": {
+    "accuracy": 0.7534,
+    "f1": 0.7534
+  },
+  "classification": {
+    "accuracy": 0.8555,
+    "f1": 0.8551
+  }
+}

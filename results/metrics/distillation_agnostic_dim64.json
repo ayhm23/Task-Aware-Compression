@@ -1,0 +1,17 @@
+{
+  "mode": "task_agnostic",
+  "method": "distillation",
+  "dim": 64,
+  "sts": {
+    "spearman": 0.8223,
+    "p_value": 0.0
+  },
+  "nli": {
+    "accuracy": 0.7229,
+    "f1": 0.7229
+  },
+  "classification": {
+    "accuracy": 0.883,
+    "f1": 0.8828
+  }
+}

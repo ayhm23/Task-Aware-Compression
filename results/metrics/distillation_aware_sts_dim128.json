@@ -1,0 +1,18 @@
+{
+  "mode": "task_aware",
+  "method": "distillation",
+  "train_task": "sts",
+  "dim": 128,
+  "sts": {
+    "spearman": 0.8048,
+    "p_value": 0.0
+  },
+  "nli": {
+    "accuracy": 0.6521,
+    "f1": 0.65
+  },
+  "classification": {
+    "accuracy": 0.8291,
+    "f1": 0.8267
+  }
+}

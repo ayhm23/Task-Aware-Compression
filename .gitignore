@@ -33,9 +33,7 @@ models/checkpoints/
 *.safetensors
 *.ckpt
 
-# ─── Results — keep PNG figures and CSV, ignore large per-run JSON files ──────
-# Individual metric JSONs (regeneratable from checkpoints)
-results/metrics/*.json
+# ─── Results — PNG figures, CSVs, and per-run metric JSONs are all committed ──
 # Plots are part of the deliverable — do NOT ignore results/plots/*.png
 
 # ─── HuggingFace Cache ────────────────────────────────────────────────────────

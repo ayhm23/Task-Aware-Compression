@@ -1,0 +1,17 @@
+{
+  "mode": "task_agnostic",
+  "method": "linear",
+  "dim": 64,
+  "sts": {
+    "spearman": 0.795,
+    "p_value": 0.0
+  },
+  "nli": {
+    "accuracy": 0.7129,
+    "f1": 0.7114
+  },
+  "classification": {
+    "accuracy": 0.8819,
+    "f1": 0.8818
+  }
+}

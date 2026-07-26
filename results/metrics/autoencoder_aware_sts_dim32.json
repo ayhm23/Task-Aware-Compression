@@ -1,0 +1,18 @@
+{
+  "mode": "task_aware",
+  "method": "autoencoder",
+  "train_task": "sts",
+  "dim": 32,
+  "sts": {
+    "spearman": 0.7637,
+    "p_value": 0.0
+  },
+  "nli": {
+    "accuracy": 0.6131,
+    "f1": 0.607
+  },
+  "classification": {
+    "accuracy": 0.7718,
+    "f1": 0.7711
+  }
+}

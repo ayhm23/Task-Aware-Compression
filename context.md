@@ -140,12 +140,14 @@ checkpoints/
 | autoencoder_agnostic | ✅ | ✅ | ✅ | ✅ |
 | distillation_agnostic | ✅ | ✅ | ✅ | ✅ |
 | pca | ✅ | ✅ | ✅ | ✅ |
-| autoencoder_mixed | ❌ | ❌ | ✅×2 | ✅×2 |
+| autoencoder_mixed (sts+nli, nli+classification) | ✅×4 | ✅×4 | ✅×4 | ✅×4 |
 | *_aware_sts | ✅×3 | ✅×3 | ✅×3 | ✅×3 |
 | *_aware_nli | ✅×3 | ✅×3 | ✅×3 | ✅×3 |
 | *_aware_classification | ✅×3 | ✅×3 | ✅×3 | ✅×3 |
 
-**Total:** 56 JSON files + `full_results_table.csv` + `task_selector_table.csv`
+Mixed-compressor entries come in pairs: a final-eval JSON and a companion `_train` JSON (metrics on the training split), for each of the two task pairs (sts+nli, nli+classification) at every dim.
+
+**Total:** 68 per-config JSON files + `baseline.json` + `multi_seed_nli_confidence.json` + `full_results_table.csv` + `task_selector_table.csv` (70 JSON files in all).
 
 **Metrics tracked:**
 - STS: Spearman ρ, p-value

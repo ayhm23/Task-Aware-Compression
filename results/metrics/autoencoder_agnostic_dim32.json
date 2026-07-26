@@ -1,0 +1,17 @@
+{
+  "mode": "task_agnostic",
+  "method": "autoencoder",
+  "dim": 32,
+  "sts": {
+    "spearman": 0.7964,
+    "p_value": 0.0
+  },
+  "nli": {
+    "accuracy": 0.6891,
+    "f1": 0.6846
+  },
+  "classification": {
+    "accuracy": 0.8842,
+    "f1": 0.8839
+  }
+}
